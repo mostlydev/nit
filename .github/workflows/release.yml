@@ -47,7 +47,11 @@ jobs:
       - name: Package
         shell: bash
         run: |
+          # GITHUB_REF_NAME is the branch on workflow_dispatch, and a branch
+          # name containing "/" turned the archive into a nested path that does
+          # not exist, failing Package on every target. Tags are unaffected.
           version="${GITHUB_REF_NAME#v}"
+          version="${version//\//-}"
           archive="gnit-${version}-${{ matrix.asset_os }}-${{ matrix.asset_arch }}.tar.gz"
           mkdir -p dist package
           bin="gnit"
