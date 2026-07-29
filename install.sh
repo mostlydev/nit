@@ -4,6 +4,7 @@ set -eu
 
 REPO="mostlydev/gnit"
 INSTALL_DIR="${GNIT_INSTALL_DIR:-$HOME/.local/bin}"
+BIN_NAME="gnit"
 
 info() { printf '  %s\n' "$@"; }
 err()  { printf 'Error: %s\n' "$@" >&2; exit 1; }
@@ -12,6 +13,10 @@ OS="$(uname -s)"
 case "$OS" in
   Linux*)  OS="linux" ;;
   Darwin*) OS="darwin" ;;
+  # Git Bash, MSYS2, and Cygwin all report a decorated name here. They are the
+  # only shells present on a stock Windows dev box, so this is how gnit gets
+  # installed on Windows at all.
+  MINGW*|MSYS*|CYGWIN*|Windows_NT) OS="windows" ;;
   *)       err "Unsupported OS: $OS" ;;
 esac
 
@@ -22,11 +27,15 @@ case "$ARCH" in
     if [ "$OS" = "darwin" ]; then
       ARCH="aarch64"
     else
-      err "Unsupported architecture until a linux/aarch64 release is published: $ARCH"
+      err "Unsupported architecture until a ${OS}/aarch64 release is published: $ARCH"
     fi
     ;;
   *) err "Unsupported architecture: $ARCH" ;;
 esac
+
+if [ "$OS" = "windows" ]; then
+  BIN_NAME="gnit.exe"
+fi
 
 info "Detected platform: ${OS}/${ARCH}"
 info "Fetching latest release..."
@@ -71,17 +80,17 @@ fi
 
 mkdir -p "$INSTALL_DIR"
 tar -xzf "${TMPDIR}/${TARBALL}" -C "$TMPDIR"
-mv "${TMPDIR}/gnit" "${INSTALL_DIR}/gnit"
-chmod +x "${INSTALL_DIR}/gnit"
+mv "${TMPDIR}/${BIN_NAME}" "${INSTALL_DIR}/${BIN_NAME}"
+chmod +x "${INSTALL_DIR}/${BIN_NAME}"
 
-info "Installed gnit to ${INSTALL_DIR}/gnit"
+info "Installed gnit to ${INSTALL_DIR}/${BIN_NAME}"
 
 # Clean up a pre-rename install (this tool shipped as "nit" through v0.8.2).
 # Other projects also ship a binary named "nit", so only remove artifacts we
 # can verify are ours: the binary by its exact version-line format, skill
 # links by resolving into our legacy data directory.
 LEGACY_BIN="${INSTALL_DIR}/nit"
-if [ -x "$LEGACY_BIN" ] && [ ! -d "$LEGACY_BIN" ]; then
+if [ "$OS" != "windows" ] && [ -x "$LEGACY_BIN" ] && [ ! -d "$LEGACY_BIN" ]; then
   LEGACY_VERSION="$("$LEGACY_BIN" --version 2>/dev/null || true)"
   if printf '%s' "$LEGACY_VERSION" | grep -qE '^nit 0\.[0-9]+\.[0-9]+$'; then
     rm -f "$LEGACY_BIN"
@@ -114,6 +123,10 @@ case ":$PATH:" in
     info "${INSTALL_DIR} is not in your PATH."
     info "Add it with:"
     info "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    if [ "$OS" = "windows" ]; then
+      info "For cmd.exe and PowerShell as well, add it persistently:"
+      info "  setx PATH \"%PATH%;$(cd "$INSTALL_DIR" && pwd -W 2>/dev/null || echo "$INSTALL_DIR")\""
+    fi
     ;;
 esac
 

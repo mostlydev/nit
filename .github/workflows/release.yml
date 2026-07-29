@@ -29,6 +29,10 @@ jobs:
             target: aarch64-apple-darwin
             asset_os: darwin
             asset_arch: aarch64
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_os: windows
+            asset_arch: x86_64
 
     steps:
       - uses: actions/checkout@v6
@@ -43,11 +47,19 @@ jobs:
       - name: Package
         shell: bash
         run: |
+          # GITHUB_REF_NAME is the branch on workflow_dispatch, and a branch
+          # name containing "/" turned the archive into a nested path that does
+          # not exist, failing Package on every target. Tags are unaffected.
           version="${GITHUB_REF_NAME#v}"
+          version="${version//\//-}"
           archive="gnit-${version}-${{ matrix.asset_os }}-${{ matrix.asset_arch }}.tar.gz"
           mkdir -p dist package
-          cp "target/${{ matrix.target }}/release/gnit" package/gnit
-          tar -C package -czf "dist/${archive}" gnit
+          bin="gnit"
+          if [ "${{ matrix.asset_os }}" = "windows" ]; then
+            bin="gnit.exe"
+          fi
+          cp "target/${{ matrix.target }}/release/${bin}" "package/${bin}"
+          tar -C package -czf "dist/${archive}" "${bin}"
       - uses: actions/upload-artifact@v7
         with:
           name: gnit-${{ matrix.asset_os }}-${{ matrix.asset_arch }}
